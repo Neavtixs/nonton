@@ -7,12 +7,14 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	server := configs.NewGin()
 	storage := configs.NewS3()
+	server.Use(cors.Default())
 
 	// check health
 	server.GET("/api/s3/check", func(ctx *gin.Context) {
