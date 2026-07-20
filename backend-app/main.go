@@ -45,8 +45,8 @@ func main() {
 
 		result, err := storage.PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(storage.Bucket),
-			Key:         aws.String("baru.txt"),
-			ContentType: aws.String("txt"),
+			Key:         aws.String(req.Filename),
+			ContentType: aws.String(req.ContentType),
 		}, func(po *s3.PresignOptions) {
 			po.Expires = 15 * time.Minute
 		})
