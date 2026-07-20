@@ -14,7 +14,7 @@ func main() {
 	server.GET("/api/s3/check", func(ctx *gin.Context) {
 		err := aws.HealthCheck(ctx)
 		if err != nil {
-			ctx.JSON(http.StatusOK, gin.H{
+			ctx.JSON(http.StatusBadRequest, gin.H{
 				"sucess": false,
 			})
 			return
