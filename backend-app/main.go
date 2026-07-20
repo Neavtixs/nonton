@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"nonton/backend-app/configs"
 	"time"
@@ -14,6 +15,7 @@ import (
 func main() {
 	server := configs.NewGin()
 	storage := configs.NewS3()
+
 	server.Use(cors.Default())
 
 	// check health
@@ -32,7 +34,15 @@ func main() {
 	})
 
 	// get presigned url s3
-	server.GET("/api/upload", func(ctx *gin.Context) {
+	type PresignRequest struct {
+		Filename    string `json:"filename"`
+		ContentType string `json:"content_type"`
+	}
+	server.POST("/api/upload", func(ctx *gin.Context) {
+		req := PresignRequest{}
+		ctx.ShouldBindJSON(&req)
+		fmt.Println(req)
+
 		result, err := storage.PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(storage.Bucket),
 			Key:         aws.String("baru.txt"),
