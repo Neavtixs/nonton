@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import Hls from "hls.js";
-import { VideoIcon, WifiIcon } from "lucide-react";
+import {
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  PlayIcon,
+  VideoIcon,
+  WifiIcon,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -100,11 +106,26 @@ export default function Home() {
             </Badge>
           </div>
 
-          <div className="justify-self-center">
-            {admin && <div>tenagh</div>}
+          <div className="justify-self-center flex">
+            {admin && (
+              <>
+                <Button size={"lg"}>
+                  <ChevronsLeftIcon />
+                  <span>10s</span>
+                </Button>
+                <Button size={"lg"}>
+                  <PlayIcon />
+                  <span>Play</span>
+                </Button>
+                <Button size={"lg"}>
+                  <span>10s</span>
+                  <ChevronsRightIcon />
+                </Button>
+              </>
+            )}
           </div>
 
-          <div className="justify-self-end ">
+          <div className="justify-self-end">
             <Button
               size={"lg"}
               onClick={() => videoRef.current!.requestFullscreen()}
