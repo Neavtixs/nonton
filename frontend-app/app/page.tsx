@@ -1,100 +1,68 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/components/ui/progress";
-import { useState } from "react";
+import Hls from "hls.js";
+import { useEffect, useRef, useState } from "react";
 
-const ApiUrl = process.env.NEXT_PUBLIC_API_URL;
+const S3Url = process.env.NEXT_PUBLIC_S3_URL;
 
-interface FileRequest {
-  filename: string;
-  content_type: string;
+function formatSpeed(bits: number) {
+  const mbps = bits / 1024 / 1024;
+  if (mbps >= 1) return `${mbps.toFixed(2)} Mbps`;
+  return `${(bits / 1024).toFixed(0)} Kbps`;
 }
 
-interface PresignRequest {
-  files: FileRequest[];
-}
-
-interface PresignFileResponse {
-  key: string;
-  upload_url: string;
-}
 export default function Home() {
-  const [file, setFile] = useState<FileList | null>(null);
-  const [progress, setProgress] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
-  const getPresignUrl = async () => {
-    if (!file) return;
+  const [resolution, setResolution] = useState("");
+  const [speed, setSpeed] = useState("");
 
-    const files = Array.from(file);
-    let uploadedFiles = 0;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-    for (let batchIndex = 0; batchIndex < files.length; batchIndex += 100) {
-      const batch = files.slice(batchIndex, batchIndex + 100);
-      const req: PresignRequest = {
-        files: batch.map((item) => {
-          return {
-            filename: item.webkitRelativePath,
-            content_type: item.type,
-          };
-        }),
+    const src = `${S3Url}/citizenofakind/output/master.m3u8`;
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        abrEwmaFastVoD: 2.0,
+        abrEwmaSlowVoD: 4.0,
+        maxBufferLength: 10,
+      });
+      hlsRef.current = hls;
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const idx = hls.currentLevel === -1 ? 0 : hls.currentLevel;
+        const level = hls.levels[idx];
+        if (level) setResolution(`${level.height}p`);
+      });
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        const level = hls.levels[data.level];
+        if (level) setResolution(`${level.height}p`);
+      });
+
+      hls.loadSource(src);
+      hls.attachMedia(video);
+
+      const id = setInterval(() => {
+        const bw = hls.bandwidthEstimate;
+        setSpeed(formatSpeed(bw));
+      }, 1000);
+
+      return () => {
+        hls.destroy();
+        clearInterval(id);
       };
-      const urls: PresignFileResponse[] = await fetch(`${ApiUrl}/api/upload`, {
-        method: "POST",
-        body: JSON.stringify(req),
-      })
-        .then((resp) => resp.json())
-        .catch(() => {
-          throw new Error("Failed to generate presigned URLs");
-        })
-        .then((res) => res.data);
-
-      // CONCURRENT UPLOAD
-      let current = 0;
-      const worker = async () => {
-        while (current < batch.length) {
-          const index = current++;
-
-          await fetch(urls[index].upload_url, {
-            method: "PUT",
-            headers: {
-              "Content-Type": batch[index].type,
-            },
-            body: batch[index],
-          });
-          uploadedFiles++;
-          setProgress((uploadedFiles / files.length) * 100);
-        }
-      };
-
-      await Promise.all(Array.from({ length: 8 }, () => worker()));
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = src;
     }
-  };
+  }, []);
 
   return (
-    <div className="p-3">
-      <div>
-        <Field>
-          <FieldLabel>Select Movie</FieldLabel>
-          <Input
-            type="file"
-            multiple
-            {...({ webkitdirectory: "", directory: "" } as any)}
-            onChange={(e) => setFile(e.target.files)}
-          />
-        </Field>
-      </div>
-      <Progress value={progress} className={"mb-4"}>
-        <ProgressLabel>Uplod Movie</ProgressLabel>
-        <ProgressValue />
-      </Progress>
-      <Button onClick={getPresignUrl}>UPLOAD</Button>
+    <div>
+      <video ref={videoRef} />
+      <h1>{resolution}</h1>
+      <h1>{speed}</h1>
     </div>
   );
 }
