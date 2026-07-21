@@ -231,11 +231,6 @@ func main() {
 		ctx.JSON(http.StatusOK, current)
 	})
 
-	server.GET("/api/video/*name", func(ctx *gin.Context) {
-		filename := ctx.Param("name")
-		ctx.File("./storage/" + filename)
-	})
-
 	// check health
 	server.GET("/api/s3/check", func(ctx *gin.Context) {
 		err := storage.HealthCheck(ctx)
