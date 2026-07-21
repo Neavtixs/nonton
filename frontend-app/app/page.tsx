@@ -35,7 +35,7 @@ export default function Home() {
   const [resolution, setResolution] = useState("");
   const [speed, setSpeed] = useState("");
   const [loading, setLoading] = useState(true);
-  const [controlLoading, setControlLoading] = useState(false);
+  const [controlLoading, setControlLoading] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -120,7 +120,8 @@ export default function Home() {
     const handleSeeking = () => {
       fetch(`${ApiUrl}/api/state/current`).then(async (resp) => {
         const data = await resp.json();
-        video.currentTime = data.currentTime;
+        const diff = Math.abs(video.currentTime - data.currentTime);
+        if (diff > 0.2) video.currentTime = data.currentTime;
       });
     };
 
@@ -139,7 +140,7 @@ export default function Home() {
       video.removeEventListener("pause", pauseHandle);
       video.removeEventListener("play", playHandle);
       video.removeEventListener("seeking", handleSeeking);
-      video.addEventListener("ratechange", handleRateChange);
+      video.removeEventListener("ratechange", handleRateChange);
     };
   }, []);
 
@@ -221,7 +222,11 @@ export default function Home() {
           <div className="justify-self-center flex">
             {admin && (
               <>
-                <Button size={"lg"} disabled={controlLoading}>
+                <Button
+                  size={"lg"}
+                  disabled={controlLoading}
+                  onClick={seekBackwardHandle}
+                >
                   <ChevronsLeftIcon />
                   <span>10s</span>
                 </Button>
@@ -233,7 +238,11 @@ export default function Home() {
                   <PlayIcon />
                   <span>{serverPlaying.current ? "Pause" : "Play"}</span>
                 </Button>
-                <Button size={"lg"} disabled={controlLoading}>
+                <Button
+                  size={"lg"}
+                  disabled={controlLoading}
+                  onClick={seekForwardHandle}
+                >
                   <span>10s</span>
                   <ChevronsRightIcon />
                 </Button>
