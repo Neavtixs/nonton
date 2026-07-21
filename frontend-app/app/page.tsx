@@ -1,6 +1,12 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import Hls from "hls.js";
+import { VideoIcon, WifiIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const S3Url = process.env.NEXT_PUBLIC_S3_URL;
@@ -12,11 +18,16 @@ function formatSpeed(bits: number) {
 }
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const admin = searchParams.get("admin");
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const serverPlaying = useRef(false);
 
   const [resolution, setResolution] = useState("");
   const [speed, setSpeed] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -59,10 +70,50 @@ export default function Home() {
   }, []);
 
   return (
-    <div>
-      <video ref={videoRef} />
-      <h1>{resolution}</h1>
-      <h1>{speed}</h1>
+    <div className="mx-25 p-2 flex flex-col gap-2">
+      <Card className="bg-black/80 aspect-video relative flex justify-center items-center">
+        {loading && (
+          <div className="absolute">
+            <Spinner className="size-8 text-white" />
+          </div>
+        )}
+        <video
+          ref={videoRef}
+          style={{ display: !loading ? "block" : "none" }}
+          onCanPlay={() => setLoading(false)}
+          className="size-full"
+        />
+      </Card>
+      {!loading && (
+        <div className="grid grid-cols-[1fr_auto_1fr] ">
+          <div className="justify-self-start flex flex-col gap-1.5">
+            <Badge variant={serverPlaying.current ? "default" : "destructive"}>
+              Current: {serverPlaying.current ? "Playing" : "Paused"}
+            </Badge>
+            <Badge variant={"secondary"}>
+              <VideoIcon data-icon="inline-start" />
+              <span>{resolution}</span>
+            </Badge>
+            <Badge variant={"secondary"}>
+              <WifiIcon data-icon="inline-start" />
+              <span>{speed}</span>
+            </Badge>
+          </div>
+
+          <div className="justify-self-center">
+            {admin && <div>tenagh</div>}
+          </div>
+
+          <div className="justify-self-end ">
+            <Button
+              size={"lg"}
+              onClick={() => videoRef.current!.requestFullscreen()}
+            >
+              Fullscreen
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
