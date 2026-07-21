@@ -13,7 +13,7 @@ import {
   WifiIcon,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const S3Url = process.env.NEXT_PUBLIC_S3_URL;
 const ApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -24,7 +24,7 @@ function formatSpeed(bits: number) {
   return `${(bits / 1024).toFixed(0)} Kbps`;
 }
 
-export default function Home() {
+function HomeClient() {
   const searchParams = useSearchParams();
   const admin = searchParams.get("admin");
 
@@ -32,6 +32,7 @@ export default function Home() {
   const hlsRef = useRef<Hls | null>(null);
   const serverPlaying = useRef(false);
 
+  const [join, setJoin] = useState(false);
   const [resolution, setResolution] = useState("");
   const [speed, setSpeed] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,8 @@ export default function Home() {
     const video = videoRef.current;
     if (!video) return;
 
-    const src = `${S3Url}/citizenofakind/output/master.m3u8`;
+    const src = `${S3Url}/now/output/master.m3u8`;
+    //const src = `${ApiUrl}/api/file/now/output/master.m3u8`;
     if (Hls.isSupported()) {
       const hls = new Hls({
         abrEwmaFastVoD: 2.0,
@@ -79,6 +81,7 @@ export default function Home() {
 
   useEffect(() => {
     if (loading) return;
+    if (!join) return;
 
     const es = new EventSource(`${ApiUrl}/api/state`);
     es.onmessage = (e) => {
@@ -100,7 +103,7 @@ export default function Home() {
     };
 
     return () => es.close();
-  }, [loading]);
+  }, [loading, join]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -203,7 +206,8 @@ export default function Home() {
           className="size-full"
         />
       </Card>
-      {!loading && (
+      {!join && <Button onClick={() => setJoin(true)}>Join Party</Button>}
+      {!loading && join && (
         <div className="grid grid-cols-[1fr_auto_1fr] ">
           <div className="justify-self-start flex flex-col gap-1.5">
             <Badge variant={serverPlaying.current ? "default" : "destructive"}>
@@ -219,36 +223,38 @@ export default function Home() {
             </Badge>
           </div>
 
-          <div className="justify-self-center flex">
-            {admin && (
-              <>
-                <Button
-                  size={"lg"}
-                  disabled={controlLoading}
-                  onClick={seekBackwardHandle}
-                >
-                  <ChevronsLeftIcon />
-                  <span>10s</span>
-                </Button>
-                <Button
-                  size={"lg"}
-                  disabled={controlLoading}
-                  onClick={serverPlaying.current ? pauseHandle : playHandle}
-                >
-                  <PlayIcon />
-                  <span>{serverPlaying.current ? "Pause" : "Play"}</span>
-                </Button>
-                <Button
-                  size={"lg"}
-                  disabled={controlLoading}
-                  onClick={seekForwardHandle}
-                >
-                  <span>10s</span>
-                  <ChevronsRightIcon />
-                </Button>
-              </>
-            )}
-          </div>
+          <Suspense fallback={<div>Loading</div>}>
+            <div className="justify-self-center flex">
+              {admin && (
+                <>
+                  <Button
+                    size={"lg"}
+                    disabled={controlLoading}
+                    onClick={seekBackwardHandle}
+                  >
+                    <ChevronsLeftIcon />
+                    <span>10s</span>
+                  </Button>
+                  <Button
+                    size={"lg"}
+                    disabled={controlLoading}
+                    onClick={serverPlaying.current ? pauseHandle : playHandle}
+                  >
+                    <PlayIcon />
+                    <span>{serverPlaying.current ? "Pause" : "Play"}</span>
+                  </Button>
+                  <Button
+                    size={"lg"}
+                    disabled={controlLoading}
+                    onClick={seekForwardHandle}
+                  >
+                    <span>10s</span>
+                    <ChevronsRightIcon />
+                  </Button>
+                </>
+              )}
+            </div>
+          </Suspense>
 
           <div className="justify-self-end">
             <Button
@@ -261,5 +267,13 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading</div>}>
+      <HomeClient />
+    </Suspense>
   );
 }
