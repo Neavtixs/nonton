@@ -73,7 +73,7 @@ export default function UploadPage() {
         }
       };
 
-      await Promise.all(Array.from({ length: 8 }, () => worker()));
+      await Promise.all(Array.from({ length: 5 }, () => worker()));
     }
   };
 
@@ -84,7 +84,7 @@ export default function UploadPage() {
           <FieldLabel>Select Movie</FieldLabel>
           <Input
             type="file"
-            multiple
+            //multiple
             {...({ webkitdirectory: "", directory: "" } as any)}
             onChange={(e) => setFile(e.target.files)}
           />
