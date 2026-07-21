@@ -36,6 +36,16 @@ export default function Home() {
     }
   };
 
+  const getFile = async () => {
+    const data = await fetch(`${ApiUrl}/api/file`, {
+      method: "GET",
+    })
+      .then((resp) => resp.json())
+      .then((res) => res.data);
+
+    console.log(data);
+  };
+
   return (
     <div className="p-3">
       <div>
@@ -50,6 +60,7 @@ export default function Home() {
         </Field>
       </div>
       <Button onClick={getPresignUrl}>GET URL</Button>
+      <Button onClick={getFile}>GET FILE</Button>
     </div>
   );
 }
