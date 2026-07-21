@@ -16,6 +16,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const S3Url = process.env.NEXT_PUBLIC_S3_URL;
+const ApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 function formatSpeed(bits: number) {
   const mbps = bits / 1024 / 1024;
@@ -34,6 +35,7 @@ export default function Home() {
   const [resolution, setResolution] = useState("");
   const [speed, setSpeed] = useState("");
   const [loading, setLoading] = useState(true);
+  const [controlLoading, setControlLoading] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -75,6 +77,116 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const es = new EventSource(`${ApiUrl}/api/state`);
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      console.log(data);
+
+      videoRef.current!.currentTime = data.currentTime;
+      serverPlaying.current = data.playing;
+
+      if (data.playing) {
+        videoRef.current!.play().catch((err) => {
+          console.log(err);
+        });
+      } else {
+        videoRef.current!.pause();
+      }
+
+      setControlLoading(false);
+    };
+
+    return () => es.close();
+  }, [loading]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const playHandle = () => {
+      if (!serverPlaying.current) {
+        video.pause();
+      }
+    };
+    const pauseHandle = () => {
+      if (serverPlaying.current) {
+        video.play().catch(() => {});
+      }
+    };
+
+    const handleSeeking = () => {
+      fetch(`${ApiUrl}/api/state/current`).then(async (resp) => {
+        const data = await resp.json();
+        video.currentTime = data.currentTime;
+      });
+    };
+
+    const handleRateChange = () => {
+      if (video.playbackRate !== 1) {
+        video.playbackRate = 1;
+      }
+    };
+
+    video.addEventListener("pause", pauseHandle);
+    video.addEventListener("play", playHandle);
+    video.addEventListener("seeking", handleSeeking);
+    video.addEventListener("ratechange", handleRateChange);
+
+    return () => {
+      video.removeEventListener("pause", pauseHandle);
+      video.removeEventListener("play", playHandle);
+      video.removeEventListener("seeking", handleSeeking);
+      video.addEventListener("ratechange", handleRateChange);
+    };
+  }, []);
+
+  function playHandle() {
+    setControlLoading(true);
+
+    fetch(`${ApiUrl}/api/state/play`, {
+      method: "PUT",
+      body: JSON.stringify({
+        currentTime: videoRef.current!.currentTime,
+      }),
+    });
+  }
+
+  function pauseHandle() {
+    setControlLoading(true);
+
+    fetch(`${ApiUrl}/api/state/pause`, {
+      method: "PUT",
+      body: JSON.stringify({
+        currentTime: videoRef.current!.currentTime,
+      }),
+    });
+  }
+
+  function seekBackwardHandle() {
+    setControlLoading(true);
+
+    fetch(`${ApiUrl}/api/state/seek`, {
+      method: "PUT",
+      body: JSON.stringify({
+        delta: -10,
+      }),
+    });
+  }
+
+  function seekForwardHandle() {
+    setControlLoading(true);
+
+    fetch(`${ApiUrl}/api/state/seek`, {
+      method: "PUT",
+      body: JSON.stringify({
+        delta: 10,
+      }),
+    });
+  }
+
   return (
     <div className="mx-25 p-2 flex flex-col gap-2">
       <Card className="bg-black/80 aspect-video relative flex justify-center items-center">
@@ -109,15 +221,19 @@ export default function Home() {
           <div className="justify-self-center flex">
             {admin && (
               <>
-                <Button size={"lg"}>
+                <Button size={"lg"} disabled={controlLoading}>
                   <ChevronsLeftIcon />
                   <span>10s</span>
                 </Button>
-                <Button size={"lg"}>
+                <Button
+                  size={"lg"}
+                  disabled={controlLoading}
+                  onClick={serverPlaying.current ? pauseHandle : playHandle}
+                >
                   <PlayIcon />
-                  <span>Play</span>
+                  <span>{serverPlaying.current ? "Pause" : "Play"}</span>
                 </Button>
-                <Button size={"lg"}>
+                <Button size={"lg"} disabled={controlLoading}>
                   <span>10s</span>
                   <ChevronsRightIcon />
                 </Button>
