@@ -33,11 +33,10 @@ export default function Home() {
     if (!file) return;
 
     const files = Array.from(file);
-    const totalFiles = files.length;
     let uploadedFiles = 0;
 
-    for (let i = 0; i < files.length; i += 100) {
-      const batch = files.slice(i, i + 100);
+    for (let batchIndex = 0; batchIndex < files.length; batchIndex += 100) {
+      const batch = files.slice(batchIndex, batchIndex + 100);
       const req: PresignRequest = {
         files: batch.map((item) => {
           return {
@@ -46,36 +45,35 @@ export default function Home() {
           };
         }),
       };
-
       const urls: PresignFileResponse[] = await fetch(`${ApiUrl}/api/upload`, {
         method: "POST",
         body: JSON.stringify(req),
       })
         .then((resp) => resp.json())
+        .catch(() => {
+          throw new Error("Failed to generate presigned URLs");
+        })
         .then((res) => res.data);
 
-      console.log(i);
-      const CONCURRENCY = 5;
-      for (let i = 0; i < batch.length; i += CONCURRENCY) {
-        const uploadBatch = batch.slice(i, i + CONCURRENCY);
-        const uploadUrls = urls.slice(i, i + CONCURRENCY);
+      // CONCURRENT UPLOAD
+      let current = 0;
+      const worker = async () => {
+        while (current < batch.length) {
+          const index = current++;
 
-        await Promise.all(
-          uploadBatch.map((file, index) =>
-            fetch(uploadUrls[index].upload_url, {
-              method: "PUT",
-              headers: {
-                "Content-Type": file.type,
-              },
-              body: file,
-            }).then(() => {
-              uploadedFiles++;
-              const progresses = (uploadedFiles / totalFiles) * 100;
-              setProgress(progresses);
-            }),
-          ),
-        );
-      }
+          await fetch(urls[index].upload_url, {
+            method: "PUT",
+            headers: {
+              "Content-Type": batch[index].type,
+            },
+            body: batch[index],
+          });
+          uploadedFiles++;
+          setProgress((uploadedFiles / files.length) * 100);
+        }
+      };
+
+      await Promise.all(Array.from({ length: 8 }, () => worker()));
     }
   };
 
