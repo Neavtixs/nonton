@@ -64,5 +64,28 @@ func main() {
 		})
 	})
 
+	server.GET("/api/file", func(ctx *gin.Context) {
+
+		result, err := storage.PresignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(storage.Bucket),
+			Key:    aws.String("citizenofakind/output/master.m3u8"),
+		}, func(po *s3.PresignOptions) {
+			po.Expires = 5 * time.Minute
+		})
+
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    result.URL,
+		})
+
+	})
+
 	server.Run()
 }
