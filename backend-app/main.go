@@ -143,7 +143,13 @@ func main() {
 	server := configs.NewGin()
 	storage := configs.NewS3()
 
-	server.Use(cors.Default())
+	server.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://127.0.0.1:3000", "http://127.0.0.1:3001", "https://nonton.muhsandi.com"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
+
 	hub := NewHub()
 
 	server.GET("/api/state", func(ctx *gin.Context) {
