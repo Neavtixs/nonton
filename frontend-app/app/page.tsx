@@ -31,6 +31,7 @@ function HomeClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const serverPlaying = useRef(false);
+  const [isIosSafari, setIsIosSafari] = useState(false);
 
   const [join, setJoin] = useState(false);
   const [resolution, setResolution] = useState("");
@@ -39,10 +40,24 @@ function HomeClient() {
   const [controlLoading, setControlLoading] = useState(true);
 
   useEffect(() => {
+    const ua = navigator.userAgent;
+
+    const isIOS =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(
+      ua,
+    );
+
+    setIsIosSafari(isIOS && isSafari);
+  }, []);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const src = `${S3Url}/now/output/master.m3u8`;
+    const src = `${ApiUrl}/api/video/now/output/master.m3u8`;
     //const src = `${ApiUrl}/api/file/now/output/master.m3u8`;
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -192,7 +207,7 @@ function HomeClient() {
   }
 
   return (
-    <div className="mx-25 p-2 flex flex-col gap-2">
+    <div className=" p-2 flex flex-col gap-2">
       <Card className="bg-black/80 aspect-video relative flex justify-center items-center">
         {loading && (
           <div className="absolute">
@@ -201,12 +216,15 @@ function HomeClient() {
         )}
         <video
           ref={videoRef}
+          controls={isIosSafari}
           style={{ display: !loading ? "block" : "none" }}
           onCanPlay={() => setLoading(false)}
           className="size-full"
         />
       </Card>
-      {!join && <Button onClick={() => setJoin(true)}>Join Party</Button>}
+      {!loading && !join && (
+        <Button onClick={() => setJoin(true)}>Join Party</Button>
+      )}
       {!loading && join && (
         <div className="grid grid-cols-[1fr_auto_1fr] ">
           <div className="justify-self-start flex flex-col gap-1.5">
