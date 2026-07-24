@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"nonton/backend-app/configs"
+	"strings"
 	"sync"
 	"time"
 
@@ -146,7 +148,7 @@ func main() {
 	server.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://127.0.0.1:3000", "http://127.0.0.1:3001", "https://nonton.muhsandi.com"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowHeaders:     []string{"*"},
 		AllowCredentials: true,
 	}))
 
@@ -269,7 +271,6 @@ func main() {
 	server.POST("/api/upload", func(ctx *gin.Context) {
 		req := PresignRequest{}
 		ctx.ShouldBindJSON(&req)
-		fmt.Println(req)
 
 		var response []PresignResponse
 
@@ -305,6 +306,81 @@ func main() {
 			"success": true,
 			"data":    response,
 		})
+	})
+
+	//rewrite manifest
+	server.GET("/api/video/*path", func(ctx *gin.Context) {
+		path := ctx.Param("path")[1:]
+		name := strings.Split(path, "/")
+
+		result, err := storage.Client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(storage.Bucket),
+			Key:    aws.String(path),
+		})
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+			})
+			return
+		}
+
+		data, err := io.ReadAll(result.Body)
+		if err != nil {
+			//some error
+		}
+		manifest := string(data)
+		isMaster := strings.Contains(manifest, "#EXT-X-STREAM-INF")
+		isMedia := strings.Contains(manifest, "#EXTINF")
+
+		fmt.Println()
+
+		lines := strings.Split(manifest, "\n")
+		for i, line := range lines {
+			if isMaster {
+				if strings.HasPrefix(line, "#") {
+					continue
+				}
+
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+
+				lines[i] = fmt.Sprintf(`/api/video/%s/%s/`, name[0], name[1]) + line
+
+			} else if isMedia {
+				if strings.HasPrefix(line, "#") {
+					continue
+				}
+
+				if line == "" {
+					continue
+				}
+
+				presign, err := storage.PresignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+					Bucket: aws.String(storage.Bucket),
+					Key:    aws.String(fmt.Sprintf(`%s/%s/%s/`, name[0], name[1], name[2]) + line),
+				}, func(po *s3.PresignOptions) {
+					po.Expires = 200 * time.Minute
+				})
+
+				if err != nil {
+					ctx.JSON(http.StatusBadRequest, gin.H{
+						"success": false,
+					})
+				}
+				lines[i] = presign.URL
+				//log.Println(presign)
+				//lines[i] = fmt.Sprintf(`/%s/%s/%s/`, name[0], name[1], name[2]) + line
+
+			}
+
+		}
+
+		newManifest := strings.Join(lines, "\n")
+
+		ctx.Header("Content-Type", "application/vnd.apple.mpegurl")
+		ctx.String(http.StatusOK, newManifest)
+
 	})
 
 	server.Run()
